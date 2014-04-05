@@ -1,11 +1,98 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= title %></title>
+    <title>Group Chat</title>
     <link rel='stylesheet' href='/stylesheets/style.css' />
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style type="text/css">
+		input{
+			display: block;
+		}
+		#container{
+			width:1000px;
+			height: 900px;
+			border: 1px solid black;
+		}
+		#chat_board{
+			width:800px;
+			height: 700px;
+			border: 1px solid black;
+			margin-left: 20px;
+			overflow: auto;
+		}
+		form{
+			width: 800px;
+			margin-left: 20px;
+			margin-top: 20px;
+		}
+		#input_area{
+			width: 800px;
+		}
+		.notification{
+			color: grey;
+		}
+    </style>
   </head>
   <body>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
+    <div id="container">
+    	<h3>Conversation Board</h3>
+    	<div id="chat_board"></div>
+    	<form action='/process' method="post">
+    		<input name="word" id="input_area" placeholder="enter your message here">
+    		<input type="submit" value="Send">
+    	</form>
+    </div>
   </body>
+  <script type="text/javascript">
+  	io=io.connect();
+  	var name=prompt("Your Name: ").trim();
+  	while(name==="")
+  	{
+  		name=prompt("Your Name: ").trim();
+  	}
+  	io.emit("ready",{name:name});
+  	$(document).ready(function(){
+  		// display all existing messages on the server
+  		io.on("existing_messages",function(data){
+  			$("#input_area").attr("user",data.message[data.message.length-1].name);
+  			for (var i = 0; i < data.message.length-1; i++) {
+  				var temp=data.message[i].message.trim()
+  				if (temp!=="") 
+  				{
+  					var html="<p class='"+data.message[i].name+"'>"+data.message[i].name+" : "+data.message[i].message+"</p>";
+  					$(html).appendTo("#chat_board");
+  				};
+  			}
+  		});
+  		// when new user enters,send the notification to all users
+  		io.on("new_user_enter",function(data){
+  			var html="<p class='notification'>"+data.message.name+" entered the room </p>";
+  			$(html).appendTo("#chat_board");
+  		})
+  		// when current user submits the message,emit the user name and message to the server
+  		$("form").submit(function(){
+  			event.preventDefault();
+  			if ($("#input_area").val()!=="")
+  			{
+  				io.emit("send_message",{name:$("#input_area").attr('user'),message:$("#input_area").val()});
+  			};
+  			$("#input_area").val("");
+  		});
+  		// when user receive new message,append the new message in the chat div 
+  		io.on("new_message",function(data){
+  			var html="<p class='"+data.message.name+"'>"+data.message.name+" : "+data.message.message+"</p>";
+  			$(html).appendTo("#chat_board");
+  		});
+  		// when the same user reenter the room with the new name
+  		io.on("old_user_enter",function(data){
+  			var el=document.getElementsByClassName(data.old[0].name);
+  			var temp="<p class='notification'>"+data.old[0].name+" has a new name: "+data.newname+"</p>";
+  				$(temp).appendTo("#chat_board");
+  			for (var i = el.length-1; i > -1; i--) {
+  				el[i].innerHTML="<p class='"+data.newname+"'>"+data.newname+" : "+data.old[i].message+"</p>";
+  			};
+  		});
+  	})
+  </script>
 </html>
